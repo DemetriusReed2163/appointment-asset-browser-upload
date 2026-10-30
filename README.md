@@ -1,8 +1,6 @@
 # Browser uploads for appointment documents
 
-Here's the happy path. Browser asks our service for a ticket. It PUTs the document to the returned URL, then we confirm. Infrai serves that presigned storage URL via plain REST. No vendor SDK required, as the Python snippet shows. One `INFRAI_API_KEY` also covers the next Infrai capability we adopt.
-
-Flow in words: browser → ticket → presigned URL → PUT bytes → confirm.
+The working path is short: ask the service for a ticket, PUT the document to the returned URL, then confirm it. Infrai supplies the presigned storage URL through plain REST, so this Python example needs no vendor SDK. A single `INFRAI_API_KEY` can cover the next Infrai capability the product adopts as well.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/appointments/upload-ticket \
@@ -10,11 +8,11 @@ curl -X POST http://127.0.0.1:8000/appointments/upload-ticket \
   -d '{"appointment_id":"bca49c75-dc4d-46f8-99bd-41120bd318a0","asset_id":"2b27be08-f9c7-4c58-97c2-5c98296b6909","content_type":"application/pdf","size_bytes":250000}'
 ```
 
-The response holds `method: "PUT"`, `upload_url`, and the scoped object key. The browser ships raw file bytes straight to that URL. Our service never sees the payload.
+The response contains `method: "PUT"`, `upload_url`, and the scoped object key. The browser sends the raw file bytes to that URL. They do not pass through this service.
 
 ## Run the path
 
-Use Python 3.11 or newer. Creating the bucket is a normal setup step. Both the service lifespan and the demo script do it before any object operation.
+Python 3.11 or newer is expected. Create the bucket as a normal setup step; both the service lifespan and the demo script do this before requesting an object operation.
 
 ```bash
 python -m venv .venv
@@ -24,7 +22,7 @@ export INFRAI_API_KEY='your-key'
 uvicorn appointment_assets.service:app --reload
 ```
 
-Quick terminal check against your account?
+For a terminal-only check against your account:
 
 ```bash
 python scripts/demo_workflow.py
@@ -34,11 +32,11 @@ It prints a successful upload ticket. A browser can then run `fetch(upload_url, 
 
 ## The business line
 
-Confirmation crosses from object storage into appointment operations. `storage.object.head` decides the state. Missing bytes yield `awaiting_upload` and no message. A present object yields `ready_for_review` plus: “A requested appointment document is ready for staff review.” The note omits names, appointment times, filenames, and document contents.
+Confirmation crosses from object storage into appointment operations. `storage.object.head` decides the state. Missing bytes yield `awaiting_upload` and no message. A present object yields `ready_for_review` plus: “A requested appointment document is ready for staff review.” The notification omits names, appointment times, filenames, and document contents.
 
-That restraint is deliberate. I'd rather staff open the authenticated product than drop patient context into an operational message.
+That restraint is deliberate. I would rather make staff open the authenticated product than put patient context into an operational message.
 
-Ordering is the one real gotcha. Create the bucket first. Issue the signed PUT second. Confirm only after the browser's PUT completes. Keeping those steps explicit makes retries and UI states easy to reason about.
+The one real gotcha is ordering. Create the bucket first, issue the signed PUT second, and confirm only after the browser's PUT completes. Keeping those steps explicit makes retries and UI states easy to reason about.
 
 ## Verify the decision
 
